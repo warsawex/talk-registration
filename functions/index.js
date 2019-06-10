@@ -1,7 +1,9 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const sendgrid = require('@sendgrid/mail');
 
 admin.initializeApp();
+sendgrid.setApiKey(functions.config().sendgrid.apikey);
 
 exports.submitTalk = functions.https.onRequest(async (req, res) => {
   const submissionParams = ["description", "email", "language", "name", "title"];
@@ -39,3 +41,30 @@ exports.submitTalk = functions.https.onRequest(async (req, res) => {
     res.status(201).end();
   }
 });
+
+exports.sendVerification = functions.database.ref("/submissions/{submissionId}").
+  onCreate((snapshot, context) => {
+    const templateId = functions.config().sendgrid.templateid;
+    const submission = snapshot.val();
+  
+    const message = {
+      to: {
+        name: submission.name,
+        email: submission.email
+      },
+      from: {
+        name: "warsaw.ex",
+        email: "hello@warsawex.org"
+      },
+      templateId: templateId,
+      dynamic_template_data: {
+        speakerName: submission.name,
+        talkTitle: submission.title,
+        talkDescription: submission.description,
+        talkLanguage: submission.language,
+        confirmationUrl: "https://www.google.com"
+      }
+    };
+
+    return sendgrid.send(message);
+  });
