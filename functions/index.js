@@ -54,8 +54,12 @@ exports.submitTalk = functions.https.onRequest(async (req, res) => {
 exports.sendVerification = functions.database
   .ref("/submissions/{submissionId}")
   .onCreate((snapshot, context) => {
-    const templateId = functions.config().sendgrid.templateid;
+    const {
+      sendgrid: { templateid: templateId },
+      submissions: { verifyurl: verifyUrl }
+    } = functions.config();
     const submission = snapshot.val();
+    const { submissionId } = context.params;
 
     const message = {
       to: {
@@ -72,9 +76,23 @@ exports.sendVerification = functions.database
         talkTitle: submission.title,
         talkDescription: submission.description,
         talkLanguage: submission.language,
-        confirmationUrl: "https://www.google.com"
+        confirmationUrl: verifyUrl + "?t=" + submissionId
       }
     };
 
     return sendgrid.send(message);
   });
+
+exports.verifyTalk = functions.https.onRequest(async (req, res) => {
+  const { t } = req.query;
+  const {
+    submissions: { postverifyurl: postVerifyUrl }
+  } = functions.config();
+
+  await admin
+    .database()
+    .ref(`/submissions/${t}`)
+    .update({ verified: true });
+
+  res.redirect(postVerifyUrl);
+});
