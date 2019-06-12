@@ -96,3 +96,29 @@ exports.verifyTalk = functions.https.onRequest(async (req, res) => {
 
   res.redirect(postVerifyUrl);
 });
+
+exports.promoteSubmission = functions.database
+  .ref("/submissions/{submissionId}")
+  .onUpdate((change, context) => {
+    const before = change.before.val();
+    const after = change.after.val();
+
+    if (before.verified === after.verified) return null;
+
+    const { submissionId } = context.params;
+
+    if (after.verified) {
+      return admin
+        .database()
+        .ref("/talks")
+        .push(after)
+        .then(() => {
+          return admin
+            .database()
+            .ref(`/submissions/${submissionId}`)
+            .remove();
+        });
+    }
+
+    return null;
+  });
